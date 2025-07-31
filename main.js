@@ -39,11 +39,98 @@ $(function() {
     }
 
     // ====== 计划数据结构 ======
-    let planList = [];
+    let planList = [
+        {
+            name: '2023年5月鉴定计划',
+            date: '2023-05',
+            deadline: '2023-04-30',
+            status: 'wait',
+            param: '150',
+            log: [
+                {action:'创建计划', user:'站点', time:'2023-04-15 10:30:00', detail:'计划名称：2023年5月鉴定计划'},
+                {action:'参数上报', user:'站点', time:'2023-04-20 14:25:30', detail:'上报参数：150'}
+            ],
+            order: {param:'150', auditor:'', auditTime:'', result:'', reason:''}
+        },
+        {
+            name: '2023年6月鉴定计划',
+            date: '2023-06',
+            deadline: '2023-05-31',
+            status: 'pass',
+            param: '200',
+            log: [
+                {action:'创建计划', user:'站点', time:'2023-05-10 09:15:00', detail:'计划名称：2023年6月鉴定计划'},
+                {action:'参数上报', user:'站点', time:'2023-05-25 16:40:20', detail:'上报参数：200'},
+                {action:'审核通过', user:'张审核', time:'2023-05-26 11:20:15', detail:'参数审核通过'}
+            ],
+            order: {param:'200', auditor:'张审核', auditTime:'2023-05-26 11:20:15', result:'通过', reason:''}
+        },
+        {
+            name: '2023年7月鉴定计划',
+            date: '2023-07',
+            deadline: '2023-06-30',
+            status: 'reject',
+            param: '300',
+            log: [
+                {action:'创建计划', user:'站点', time:'2023-06-05 13:45:00', detail:'计划名称：2023年7月鉴定计划'},
+                {action:'参数上报', user:'站点', time:'2023-06-28 10:15:45', detail:'上报参数：300'},
+                {action:'审核驳回', user:'张审核', time:'2023-06-29 15:30:20', detail:'驳回原因：计划量超出合理范围'}
+            ],
+            order: {param:'300', auditor:'张审核', auditTime:'2023-06-29 15:30:20', result:'驳回', reason:'计划量超出合理范围'}
+        },
+        {
+            name: '2023年8月鉴定计划',
+            date: '2023-08',
+            deadline: '2023-07-31',
+            status: 'wait',
+            param: '180',
+            log: [
+                {action:'创建计划', user:'站点', time:'2023-07-12 08:30:00', detail:'计划名称：2023年8月鉴定计划'},
+                {action:'参数上报', user:'站点', time:'2023-07-25 14:50:10', detail:'上报参数：180'}
+            ],
+            order: {param:'180', auditor:'', auditTime:'', result:'', reason:''}
+        }
+    ];
     let auditorName = '张审核';
 
     // ====== 日结算任务数据结构 ======
-    let settlementList = [];
+    let settlementList = [
+        {
+            id: 1,
+            date: '2023-07-15',
+            read: true,
+            stat: {total: 12, makeup: 2, first: 10, actual: 11, absent: 1, delay: 0},
+            reportTime: '2023-07-15 16:30:25'
+        },
+        {
+            id: 2,
+            date: '2023-07-16',
+            read: false,
+            stat: {total: 15, makeup: 3, first: 12, actual: 14, absent: 0, delay: 1},
+            reportTime: '2023-07-16 17:15:42'
+        },
+        {
+            id: 3,
+            date: '2023-07-17',
+            read: true,
+            stat: {total: 8, makeup: 1, first: 7, actual: 7, absent: 1, delay: 0},
+            reportTime: '2023-07-17 15:45:18'
+        },
+        {
+            id: 4,
+            date: '2023-07-18',
+            read: false,
+            stat: {total: 20, makeup: 4, first: 16, actual: 18, absent: 2, delay: 0},
+            reportTime: '2023-07-18 16:20:33'
+        },
+        {
+            id: 5,
+            date: '2023-07-19',
+            read: true,
+            stat: {total: 11, makeup: 2, first: 9, actual: 10, absent: 1, delay: 0},
+            reportTime: '2023-07-19 14:55:07'
+        }
+    ];
 
     // ====== 考评任务委派数据结构 ======
     let assignList = [];
@@ -358,7 +445,7 @@ $(function() {
         ban: '<div class="card"><h2>禁考管理</h2><div>这里是禁考管理模块内容。</div></div>',
         edit: '<div class="card"><h2>信息修改权限</h2><div>这里是信息修改权限模块内容。</div></div>',
         audit: '<div class="card"><h2>资料审核优化</h2><div>这里是资料审核优化模块内容。</div></div>',
-        screen: '<div class="card"><h2>数据大屏</h2><div>这里是数据大屏模块内容。</div></div>'
+        screen: window.getScreenModuleHtml()
     };
 
     // ====== 初始加载 ======
@@ -396,8 +483,15 @@ $(function() {
             $('#main-content').html(getAuditModuleHtml());
             bindAuditModuleEvents();
         } else if(module === 'screen') {
-            $('#main-content').html(getScreenModuleHtml());
-            bindScreenModuleEvents();
+            // 保存进入数据大屏前的状态
+            const currentActiveMenu = $('.menu-item.active');
+            if (currentActiveMenu.length > 0) {
+                window.previousModule = currentActiveMenu.data('module');
+                window.previousModuleHtml = $('#main-content').html();
+            }
+            
+            $('#main-content').html(window.getScreenModuleHtml());
+            window.bindScreenModuleEvents();
         } else {
             $('#main-content').html(modules[module]);
         }
@@ -405,15 +499,94 @@ $(function() {
 
     // ====== 计划模块HTML ======
     function getPlanModuleHtml() {
+        // 如果是参数审核员身份，显示模块切换
+        if (currentRole === 'auditor') {
+            let auditorTab = window.auditorTab || 'pending'; // 默认显示待审核
+            let html = `<div class="card">
+                <h2>鉴定计划备案 - 参数审核员</h2>
+                <div style="display:flex;align-items:center;gap:18px;margin-bottom:18px;">
+                    <button class="auditor-tab-btn ${auditorTab === 'pending' ? 'active' : ''}" data-tab="pending" style="background:${auditorTab === 'pending' ? '#2d8cf0' : '#f5f5f5'};color:${auditorTab === 'pending' ? '#fff' : '#333'};border:none;border-radius:5px;padding:8px 20px;font-size:15px;cursor:pointer;">参数待审核</button>
+                    <button class="auditor-tab-btn ${auditorTab === 'reviewed' ? 'active' : ''}" data-tab="reviewed" style="background:${auditorTab === 'reviewed' ? '#2d8cf0' : '#f5f5f5'};color:${auditorTab === 'reviewed' ? '#fff' : '#333'};border:none;border-radius:5px;padding:8px 20px;font-size:15px;cursor:pointer;">参数已审核</button>
+                </div>`;
+            
+            if (auditorTab === 'pending') {
+                // 参数待审核模块
+                const pendingPlans = planList.filter(item => item.status === 'wait');
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px 0;">
+                    <h3 style="margin:0;">参数待审核计划 (${pendingPlans.length})</h3>
+                    <div>
+                        <button class="export-pending-plan" style="background:#2d8cf0;color:#fff;border:none;border-radius:5px;padding:6px 18px;font-size:15px;cursor:pointer;">导出待审核</button>
+                    </div>
+                </div>
+                <table class="plan-table">
+                    <thead>
+                        <tr><th>计划名称</th><th>计划时间</th><th>截止时间</th><th>参数</th><th>上报时间</th><th>操作</th></tr>
+                    </thead>
+                    <tbody>
+                        ${pendingPlans.length === 0 ? '<tr><td colspan="6">暂无待审核计划</td></tr>' : pendingPlans.map((item, idx) => {
+                            const originalIdx = planList.findIndex(p => p.name === item.name && p.date === item.date);
+                            const reportLog = item.log.find(l => l.action === '参数上报');
+                            return `<tr>
+                                <td>${item.name}</td>
+                                <td>${item.date}</td>
+                                <td>${item.deadline}</td>
+                                <td>${item.param || '-'}</td>
+                                <td>${reportLog ? reportLog.time : '-'}</td>
+                                <td>
+                                    <button class="view-pending-detail" data-idx="${originalIdx}">查看详情</button>
+                                    <button class="audit-param" data-idx="${originalIdx}">审核</button>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>`;
+            } else {
+                // 参数已审核模块
+                const reviewedPlans = planList.filter(item => item.status === 'pass' || item.status === 'reject');
+                html += `<div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px 0;">
+                    <h3 style="margin:0;">参数已审核计划 (${reviewedPlans.length})</h3>
+                    <div>
+                        <button class="export-reviewed-plan" style="background:#2d8cf0;color:#fff;border:none;border-radius:5px;padding:6px 18px;font-size:15px;cursor:pointer;">导出已审核</button>
+                    </div>
+                </div>
+                <table class="plan-table">
+                    <thead>
+                        <tr><th>计划名称</th><th>计划时间</th><th>截止时间</th><th>参数</th><th>审核结果</th><th>审核时间</th><th>操作</th></tr>
+                    </thead>
+                    <tbody>
+                        ${reviewedPlans.length === 0 ? '<tr><td colspan="7">暂无已审核计划</td></tr>' : reviewedPlans.map((item, idx) => {
+                            const originalIdx = planList.findIndex(p => p.name === item.name && p.date === item.date);
+                            const auditLog = item.log.find(l => l.action === '审核通过' || l.action === '审核驳回');
+                            return `<tr>
+                                <td>${item.name}</td>
+                                <td>${item.date}</td>
+                                <td>${item.deadline}</td>
+                                <td>${item.param || '-'}</td>
+                                <td><span style="color:${item.status === 'pass' ? '#52c41a' : '#f5222d'};">${getPlanStatusText(item.status)}</span></td>
+                                <td>${auditLog ? auditLog.time : '-'}</td>
+                                <td>
+                                    <button class="view-reviewed-detail" data-idx="${originalIdx}">查看详情</button>
+                                    <button class="view-log" data-idx="${originalIdx}">审批日志</button>
+                                </td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>`;
+            }
+            
+            html += `</div>`;
+            return html;
+        }
+        
+        // 鉴定站点身份显示原有内容
         let html = `<div class="card">
             <h2>鉴定计划备案</h2>
-            ${currentRole === 'site' ? `
             <form id="plan-form" class="plan-form">
                 <label>计划名称：<input type="text" name="name" required></label>
                 <label>计划时间：<input type="month" name="date" required></label>
                 <label>参数上报截止时间：<input type="date" name="deadline" required></label>
                 <button type="submit">创建计划模板</button>
-            </form>` : ''}
+            </form>
             <div style="display:flex;justify-content:space-between;align-items:center;margin:18px 0 8px 0;">
                 <h3 style="margin:0;">所有鉴定计划</h3>
                 <div>
@@ -435,8 +608,7 @@ $(function() {
                             <td>
                                 <button class="view-log" data-idx="${idx}">审批日志</button>
                                 <button class="view-order" data-idx="${idx}">工单</button>
-                                ${currentRole === 'site' && item.status === 'param' ? `<button class="report-param" data-idx="${idx}">参数上报</button>` : ''}
-                                ${currentRole === 'auditor' && item.status === 'wait' ? `<button class="audit-param" data-idx="${idx}">审核</button>` : ''}
+                                ${item.status === 'param' ? `<button class="report-param" data-idx="${idx}">参数上报</button>` : ''}
                             </td>
                         </tr>
                     `).join('')}
@@ -457,6 +629,14 @@ $(function() {
 
     // ====== 计划模块事件 ======
     function bindPlanModuleEvents() {
+        // 参数审核员模块切换
+        $('.auditor-tab-btn').on('click', function() {
+            const tab = $(this).data('tab');
+            window.auditorTab = tab;
+            $('#main-content').html(getPlanModuleHtml());
+            bindPlanModuleEvents();
+        });
+        
         // 创建计划模板
         $('#plan-form').on('submit', function(e) {
             e.preventDefault();
@@ -554,19 +734,129 @@ $(function() {
             URL.revokeObjectURL(url);
             showToast('导出成功！');
         });
+        
+        // 导出待审核计划
+        $('.export-pending-plan').on('click', function() {
+            const pendingPlans = planList.filter(item => item.status === 'wait');
+            if(pendingPlans.length===0) { showToast('暂无待审核数据可导出'); return; }
+            let csv = '\uFEFF计划名称,计划时间,截止时间,参数,上报时间\n';
+            pendingPlans.forEach(item=>{
+                const reportLog = item.log.find(l => l.action === '参数上报');
+                csv += `${item.name},=\"${item.date}\",=\"${item.deadline}\",${item.param||'-'},=\"${reportLog ? reportLog.time : '-'}\"\n`;
+            });
+            const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '参数待审核计划.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('导出成功！');
+        });
+        
+        // 导出已审核计划
+        $('.export-reviewed-plan').on('click', function() {
+            const reviewedPlans = planList.filter(item => item.status === 'pass' || item.status === 'reject');
+            if(reviewedPlans.length===0) { showToast('暂无已审核数据可导出'); return; }
+            let csv = '\uFEFF计划名称,计划时间,截止时间,参数,审核结果,审核时间\n';
+            reviewedPlans.forEach(item=>{
+                const auditLog = item.log.find(l => l.action === '审核通过' || l.action === '审核驳回');
+                csv += `${item.name},=\"${item.date}\",=\"${item.deadline}\",${item.param||'-'},${getPlanStatusText(item.status)},=\"${auditLog ? auditLog.time : '-'}\"\n`;
+            });
+            const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '参数已审核计划.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('导出成功！');
+        });
+        
+        // 查看待审核详情
+        $('.view-pending-detail').on('click', function() {
+            const idx = $(this).data('idx');
+            const item = planList[idx];
+            const reportLog = item.log.find(l => l.action === '参数上报');
+            let html = `
+                <div style="margin-bottom:15px;">
+                    <h3 style="margin-bottom:10px;">计划基本信息</h3>
+                    <p><strong>计划名称：</strong>${item.name}</p>
+                    <p><strong>计划时间：</strong>${item.date}</p>
+                    <p><strong>截止时间：</strong>${item.deadline}</p>
+                    <p><strong>当前状态：</strong><span style="color:#ff9900;">待审核</span></p>
+                </div>
+                <div style="margin-bottom:15px;">
+                    <h3 style="margin-bottom:10px;">参数信息</h3>
+                    <p><strong>月计划量：</strong>${item.param || '-'}</p>
+                    <p><strong>上报时间：</strong>${reportLog ? reportLog.time : '-'}</p>
+                    <p><strong>上报人：</strong>${reportLog ? reportLog.user : '-'}</p>
+                </div>
+                <div>
+                    <h3 style="margin-bottom:10px;">操作提示</h3>
+                    <p>请点击"审核"按钮进行参数审核操作</p>
+                </div>
+            `;
+            showModal('待审核计划详情', html, null, null, '关闭');
+        });
+        
+        // 查看已审核详情
+        $('.view-reviewed-detail').on('click', function() {
+            const idx = $(this).data('idx');
+            const item = planList[idx];
+            const auditLog = item.log.find(l => l.action === '审核通过' || l.action === '审核驳回');
+            const reportLog = item.log.find(l => l.action === '参数上报');
+            let html = `
+                <div style="margin-bottom:15px;">
+                    <h3 style="margin-bottom:10px;">计划基本信息</h3>
+                    <p><strong>计划名称：</strong>${item.name}</p>
+                    <p><strong>计划时间：</strong>${item.date}</p>
+                    <p><strong>截止时间：</strong>${item.deadline}</p>
+                    <p><strong>当前状态：</strong><span style="color:${item.status === 'pass' ? '#52c41a' : '#f5222d'};">${getPlanStatusText(item.status)}</span></p>
+                </div>
+                <div style="margin-bottom:15px;">
+                    <h3 style="margin-bottom:10px;">参数信息</h3>
+                    <p><strong>月计划量：</strong>${item.param || '-'}</p>
+                    <p><strong>上报时间：</strong>${reportLog ? reportLog.time : '-'}</p>
+                    <p><strong>上报人：</strong>${reportLog ? reportLog.user : '-'}</p>
+                </div>
+                <div style="margin-bottom:15px;">
+                    <h3 style="margin-bottom:10px;">审核信息</h3>
+                    <p><strong>审核结果：</strong><span style="color:${item.status === 'pass' ? '#52c41a' : '#f5222d'};">${getPlanStatusText(item.status)}</span></p>
+                    <p><strong>审核时间：</strong>${auditLog ? auditLog.time : '-'}</p>
+                    <p><strong>审核人：</strong>${auditLog ? auditLog.user : '-'}</p>
+                    ${item.status === 'reject' ? `<p><strong>驳回原因：</strong>${item.order.reason || '-'}</p>` : ''}
+                </div>
+            `;
+            showModal('已审核计划详情', html, null, null, '关闭');
+        });
     }
 
     // ====== 更新settlement模块内容 ======
     function getSettlementModuleHtml() {
-        // 日期筛选
-        const today = new Date();
-        const todayStr = today.getFullYear()+'-'+(today.getMonth()+1).toString().padStart(2,'0')+'-'+today.getDate().toString().padStart(2,'0');
-        let filterDate = window.settleFilterDate || todayStr;
-        // 任务筛选
-        const filtered = settlementList.filter(item=>item.date===filterDate);
+        // 获取当前选中的标签页
+        let settleTab = window.settleTab || 'daily'; // daily: 日任务上报, history: 备案任务记录
+        
         let html = `<div class="card">
             <h2>成绩日结算任务上报备案</h2>
             <div style="display:flex;align-items:center;gap:18px;margin-bottom:18px;">
+                <button class="settle-tab-btn ${settleTab === 'daily' ? 'active' : ''}" data-tab="daily" style="background:${settleTab === 'daily' ? '#2d8cf0' : '#f5f5f5'};color:${settleTab === 'daily' ? '#fff' : '#333'};border:none;border-radius:5px;padding:8px 20px;font-size:15px;cursor:pointer;">日任务上报</button>
+                <button class="settle-tab-btn ${settleTab === 'history' ? 'active' : ''}" data-tab="history" style="background:${settleTab === 'history' ? '#2d8cf0' : '#f5f5f5'};color:${settleTab === 'history' ? '#fff' : '#333'};border:none;border-radius:5px;padding:8px 20px;font-size:15px;cursor:pointer;">备案任务记录</button>
+            </div>`;
+        
+        if (settleTab === 'daily') {
+            // 日任务上报模块
+            const today = new Date();
+            const todayStr = today.getFullYear()+'-'+(today.getMonth()+1).toString().padStart(2,'0')+'-'+today.getDate().toString().padStart(2,'0');
+            let filterDate = window.settleFilterDate || todayStr;
+            // 任务筛选
+            const filtered = settlementList.filter(item=>item.date===filterDate);
+            
+            html += `<div style="display:flex;align-items:center;gap:18px;margin-bottom:18px;">
                 <label>筛选日期：<input type="date" id="settle-date-filter" value="${filterDate}"></label>
                 <button class="add-settle" style="background:#2d8cf0;color:#fff;border:none;border-radius:5px;padding:6px 18px;font-size:15px;cursor:pointer;">上报日任务</button>
                 <button class="batch-read" style="background:#52c41a;color:#fff;border:none;border-radius:5px;padding:6px 18px;font-size:15px;cursor:pointer;">批量已读</button>
@@ -588,15 +878,94 @@ $(function() {
                         </tr>
                     `).join('')}
                 </tbody>
-            </table>
-        </div>`;
+            </table>`;
+        } else {
+            // 备案任务记录模块
+            let historyFilterDate = window.settleHistoryFilterDate || '';
+            let historyFilterStatus = window.settleHistoryFilterStatus || 'all';
+            
+            // 筛选历史记录
+            let filteredHistory = settlementList;
+            if (historyFilterDate) {
+                filteredHistory = filteredHistory.filter(item => item.date === historyFilterDate);
+            }
+            if (historyFilterStatus !== 'all') {
+                filteredHistory = filteredHistory.filter(item => 
+                    (historyFilterStatus === 'read' && item.read) || 
+                    (historyFilterStatus === 'unread' && !item.read)
+                );
+            }
+            
+            // 按日期倒序排列
+            filteredHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            html += `<div style="display:flex;align-items:center;gap:18px;margin-bottom:18px;">
+                <label>日期筛选：<input type="date" id="settle-history-date-filter" value="${historyFilterDate}" placeholder="选择日期"></label>
+                <label>状态筛选：
+                    <select id="settle-history-status-filter">
+                        <option value="all"${historyFilterStatus === 'all' ? ' selected' : ''}>全部</option>
+                        <option value="read"${historyFilterStatus === 'read' ? ' selected' : ''}>已读</option>
+                        <option value="unread"${historyFilterStatus === 'unread' ? ' selected' : ''}>未读</option>
+                    </select>
+                </label>
+                <button class="export-settle-history" style="background:#2d8cf0;color:#fff;border:none;border-radius:5px;padding:6px 18px;font-size:15px;cursor:pointer;">导出记录</button>
+            </div>
+            <table class="plan-table">
+                <thead>
+                    <tr><th>日期</th><th>考生总数</th><th>补考考生</th><th>初考考生</th><th>实际参考</th><th>缺考</th><th>延期</th><th>状态</th><th>上报时间</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+                    ${filteredHistory.length === 0 ? '<tr><td colspan="10">暂无历史记录</td></tr>' : filteredHistory.map((item, idx) => `
+                        <tr class="${item.read ? '' : 'unread-row'}">
+                            <td>${item.date}</td>
+                            <td>${item.stat.total}</td>
+                            <td>${item.stat.makeup}</td>
+                            <td>${item.stat.first}</td>
+                            <td>${item.stat.actual}</td>
+                            <td>${item.stat.absent}</td>
+                            <td>${item.stat.delay}</td>
+                            <td>${item.read ? '已读' : '未读'}</td>
+                            <td>${item.reportTime || '-'}</td>
+                            <td>
+                                <button class="view-settle-history" data-idx="${item.id}">查看详情</button>
+                                ${!item.read ? `<button class="mark-read-history" data-idx="${item.id}">标记已读</button>` : ''}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+        }
+        
+        html += `</div>`;
         return html;
     }
     // ====== 绑定settlement模块事件 ======
     function bindSettlementModuleEvents() {
-        // 日期筛选
+        // 模块切换
+        $('.settle-tab-btn').on('click', function() {
+            const tab = $(this).data('tab');
+            window.settleTab = tab;
+            $('#main-content').html(getSettlementModuleHtml());
+            bindSettlementModuleEvents();
+        });
+        
+        // 日任务上报模块 - 日期筛选
         $('#settle-date-filter').on('change', function() {
             window.settleFilterDate = $(this).val();
+            $('#main-content').html(getSettlementModuleHtml());
+            bindSettlementModuleEvents();
+        });
+        
+        // 备案任务记录模块 - 日期筛选
+        $('#settle-history-date-filter').on('change', function() {
+            window.settleHistoryFilterDate = $(this).val();
+            $('#main-content').html(getSettlementModuleHtml());
+            bindSettlementModuleEvents();
+        });
+        
+        // 备案任务记录模块 - 状态筛选
+        $('#settle-history-status-filter').on('change', function() {
+            window.settleHistoryFilterStatus = $(this).val();
             $('#main-content').html(getSettlementModuleHtml());
             bindSettlementModuleEvents();
         });
@@ -666,7 +1035,21 @@ $(function() {
                     showToast('实际参考+缺考+延期 必须等于 总数！'); return;
                 }
                 const id = Date.now();
-                settlementList.push({id, date, read: false, stat: {total, makeup, first, actual, absent, delay}});
+                const reportTime = new Date().toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                settlementList.push({
+                    id, 
+                    date, 
+                    read: false, 
+                    stat: {total, makeup, first, actual, absent, delay},
+                    reportTime: reportTime
+                });
                 window.settleFilterDate = date;
                 $('#main-content').html(getSettlementModuleHtml());
                 bindSettlementModuleEvents();
@@ -699,11 +1082,109 @@ $(function() {
             $('#main-content').html(getSettlementModuleHtml());
             bindSettlementModuleEvents();
         });
-        // 批量已读
+        // 批量已读 - 只操作当前筛选日期的未读任务
         $('.batch-read').on('click', function() {
-            settlementList.forEach(item=>{ if(!item.read) item.read=true; });
+            const filterDate = window.settleFilterDate || new Date().toISOString().split('T')[0];
+            let updatedCount = 0;
+            settlementList.forEach(item => {
+                if (item.date === filterDate && !item.read) {
+                    item.read = true;
+                    updatedCount++;
+                }
+            });
             $('#main-content').html(getSettlementModuleHtml());
             bindSettlementModuleEvents();
+            showToast(`已标记${updatedCount}条任务为已读！`);
+        });
+        
+        // 导出历史记录
+        $('.export-settle-history').on('click', function() {
+            let historyFilterDate = window.settleHistoryFilterDate || '';
+            let historyFilterStatus = window.settleHistoryFilterStatus || 'all';
+            
+            // 筛选历史记录
+            let filteredHistory = settlementList;
+            if (historyFilterDate) {
+                filteredHistory = filteredHistory.filter(item => item.date === historyFilterDate);
+            }
+            if (historyFilterStatus !== 'all') {
+                filteredHistory = filteredHistory.filter(item => 
+                    (historyFilterStatus === 'read' && item.read) || 
+                    (historyFilterStatus === 'unread' && !item.read)
+                );
+            }
+            
+            // 按日期倒序排列
+            filteredHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            if (filteredHistory.length === 0) {
+                showToast('暂无数据可导出！');
+                return;
+            }
+            
+            // 生成CSV内容
+            let csv = '\uFEFF日期,考生总数,补考考生,初考考生,实际参考,缺考,延期,状态,上报时间\n';
+            filteredHistory.forEach(item => {
+                csv += `${item.date},${item.stat.total},${item.stat.makeup},${item.stat.first},${item.stat.actual},${item.stat.absent},${item.stat.delay},${item.read ? '已读' : '未读'},="${item.reportTime || '-'}"\n`;
+            });
+            
+            const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '成绩日结算任务历史记录.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('导出成功！');
+        });
+        
+        // 查看历史记录详情
+        $('.view-settle-history').on('click', function() {
+            const id = $(this).data('idx');
+            const item = settlementList.find(x => x.id == id);
+            if (item) item.read = true;
+            
+            let html = `
+                <div style="margin-bottom:15px;">
+                    <h3 style="margin-bottom:10px;">任务基本信息</h3>
+                    <p><strong>日期：</strong>${item.date}</p>
+                    <p><strong>上报时间：</strong>${item.reportTime || '-'}</p>
+                    <p><strong>状态：</strong>${item.read ? '已读' : '未读'}</p>
+                </div>
+                <div style="margin-bottom:15px;">
+                    <h3 style="margin-bottom:10px;">考生统计</h3>
+                    <p><strong>考生总数：</strong>${item.stat.total}</p>
+                    <p><strong>补考考生：</strong>${item.stat.makeup}</p>
+                    <p><strong>初考考生：</strong>${item.stat.first}</p>
+                    <p><strong>实际参考：</strong>${item.stat.actual}</p>
+                    <p><strong>缺考：</strong>${item.stat.absent}</p>
+                    <p><strong>延期考生：</strong>${item.stat.delay}</p>
+                </div>
+                <div>
+                    <h3 style="margin-bottom:10px;">统计说明</h3>
+                    <p>• 考生总数 = 补考考生 + 初考考生</p>
+                    <p>• 考生总数 = 实际参考 + 缺考 + 延期</p>
+                </div>
+            `;
+            
+            showModal('历史记录详情', html, function() {
+                $('#main-content').html(getSettlementModuleHtml());
+                bindSettlementModuleEvents();
+            }, null, '关闭');
+        });
+        
+        // 标记历史记录为已读
+        $('.mark-read-history').on('click', function() {
+            const id = $(this).data('idx');
+            const item = settlementList.find(x => x.id == id);
+            if (item) {
+                item.read = true;
+                $('#main-content').html(getSettlementModuleHtml());
+                bindSettlementModuleEvents();
+                showToast('已标记为已读！');
+            }
         });
     }
 
@@ -2233,16 +2714,16 @@ $(function() {
                 return;
             }
             
-            // 获取审核通过的考生列表
-            const approvedStudents = studentList.filter(s => s.status === 'approved');
-            if (approvedStudents.length === 0) {
-                showToast('暂无审核通过的考生信息可修改！');
+            // 获取所有考生列表（允许对所有考生进行修改申请）
+            const availableStudents = studentList.filter(s => s.name && s.idCard);
+            if (availableStudents.length === 0) {
+                showToast('暂无考生信息可修改！');
                 return;
             }
             
             // 构建考生选择下拉框选项
-            const studentOptions = approvedStudents.map(s => 
-                `<option value="${s.id}">${s.name} (${s.idCard})</option>`
+            const studentOptions = availableStudents.map(s => 
+                `<option value="${s.id}">${s.name} (${s.idCard}) - ${s.org}</option>`
             ).join('');
             
             showModal('新增考生信息修改申请', `
@@ -2367,7 +2848,7 @@ $(function() {
                         <p><strong>身份证：</strong>${student.idCard}</p>
                         <p><strong>所属机构：</strong>${student.org}</p>
                         <p><strong>考试计划：</strong>${student.plan}</p>
-                        <p><strong>方向：</strong>${student.direction}</p>
+                        <p><strong>专业方向：</strong>${student.direction}</p>
                         <p><strong>级别：</strong>${student.level}</p>
                     `);
                     
@@ -2376,12 +2857,12 @@ $(function() {
                 }
             });
             
-            // 修改类型变化时更新原值
+            // 修改类型改变时更新原值
             $(document).on('change', '#edit-type-select', function() {
                 updateOldValue();
             });
             
-            // 更新原值函数
+            // 更新原值的函数
             function updateOldValue() {
                 const studentId = $('#edit-student-select').val();
                 const modifyType = $('#edit-type-select').val();
@@ -2389,7 +2870,7 @@ $(function() {
                 
                 if (student && modifyType) {
                     let oldValue = '';
-                    switch(modifyType) {
+                    switch (modifyType) {
                         case '姓名':
                             oldValue = student.name;
                             break;
@@ -2397,7 +2878,7 @@ $(function() {
                             oldValue = student.idCard;
                             break;
                         case '照片':
-                            oldValue = '原照片';
+                            oldValue = student.photo;
                             break;
                     }
                     $('#edit-old-value').val(oldValue);
@@ -2405,7 +2886,7 @@ $(function() {
             }
             
             // 触发一次考生选择变化，初始化信息
-            if (approvedStudents.length > 0) {
+            if (availableStudents.length > 0) {
                 setTimeout(() => {
                     $('#edit-student-select').trigger('change');
                 }, 100);
@@ -2554,187 +3035,187 @@ $(function() {
 
     // ====== 更新audit模块内容 ======
     function getAuditModuleHtml() {
-        // 标签数据（可持久化到localStorage）
+    // 标签数据（可持久化到localStorage）
         let defaultTags = ["证件照片模糊","信息不符","资料不全","证件过期","资料齐全无问题"];
-        let customTags = JSON.parse(localStorage.getItem('customAuditTags')||'[]');
-        let tags = [...defaultTags, ...customTags];
-        let tagHtml = tags.map(t=>`<span class=\"audit-tag\" style=\"display:inline-block;background:#f0f0f0;border-radius:3px;padding:2px 8px;margin:2px;cursor:pointer;\">${t}${customTags.includes(t)?`<span class=\"del-tag\" style=\"color:#f5222d;margin-left:4px;cursor:pointer;\">×</span>`:''}</span>`).join('');
-
+    let customTags = JSON.parse(localStorage.getItem('customAuditTags')||'[]');
+    let tags = [...defaultTags, ...customTags];
+    let tagHtml = tags.map(t=>`<span class=\"audit-tag\" style=\"display:inline-block;background:#f0f0f0;border-radius:3px;padding:2px 8px;margin:2px;cursor:pointer;\">${t}${customTags.includes(t)?`<span class=\"del-tag\" style=\"color:#f5222d;margin-left:4px;cursor:pointer;\">×</span>`:''}</span>`).join('');
+    
         // 使用全局 studentList
-        let html = `<div class=\"card\">
-            <h2>资料审核优化</h2>
-            <div style=\"margin-top:0;margin-bottom:24px;\">
-                <h3>待审核考生资料</h3>
-                <table style=\"width:100%;border-collapse:collapse;text-align:center;\">
-                    <thead>
-                        <tr style=\"background-color:#f5f5f5;\">
-                            <th style=\"padding:8px;border:1px solid #ddd;\">姓名</th>
-                            <th style=\"padding:8px;border:1px solid #ddd;\">身份证号</th>
-                            <th style=\"padding:8px;border:1px solid #ddd;\">照片</th>
-                            <th style=\"padding:8px;border:1px solid #ddd;\">状态</th>
-                            <th style=\"padding:8px;border:1px solid #ddd;\">审核原因</th>
-                            <th style=\"padding:8px;border:1px solid #ddd;\">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${studentList.map(s => `
+    let html = `<div class=\"card\">
+        <h2>资料审核优化</h2>
+        <div style=\"margin-top:0;margin-bottom:24px;\">
+            <h3>待审核考生资料</h3>
+            <table style=\"width:100%;border-collapse:collapse;text-align:center;\">
+                <thead>
+                    <tr style=\"background-color:#f5f5f5;\">
+                        <th style=\"padding:8px;border:1px solid #ddd;\">姓名</th>
+                        <th style=\"padding:8px;border:1px solid #ddd;\">身份证号</th>
+                        <th style=\"padding:8px;border:1px solid #ddd;\">照片</th>
+                        <th style=\"padding:8px;border:1px solid #ddd;\">状态</th>
+                        <th style=\"padding:8px;border:1px solid #ddd;\">审核原因</th>
+                        <th style=\"padding:8px;border:1px solid #ddd;\">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${studentList.map(s => `
                         <tr data-student-id=\"${s.id}\">
-                            <td style=\"padding:8px;border:1px solid #ddd;\">${s.name}</td>
-                            <td style=\"padding:8px;border:1px solid #ddd;\">${s.idCard}</td>
-                            <td style=\"padding:8px;border:1px solid #ddd;\"><img src=\"${s.photo}\" style=\"width:50px;height:50px;\"/></td>
+                        <td style=\"padding:8px;border:1px solid #ddd;\">${s.name}</td>
+                        <td style=\"padding:8px;border:1px solid #ddd;\">${s.idCard}</td>
+                        <td style=\"padding:8px;border:1px solid #ddd;\"><img src=\"${s.photo}\" style=\"width:50px;height:50px;\"/></td>
                             <td style=\"padding:8px;border:1px solid #ddd;\">${s.status === 'pass' ? '已通过' : s.status === 'reject' ? '已驳回' : ''}</td>
-                            <td style=\"padding:8px;border:1px solid #ddd;\">
-                                <div class=\"student-reason\" data-id=\"${s.id}\">${s.reason || '请选择原因'}</div>
-                            </td>
-                            <td style=\"padding:8px;border:1px solid #ddd;\">
-                                <button class=\"audit-pass\" data-id=\"${s.id}\" style=\"margin-right:5px;background:#52c41a;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;\">通过</button>
-                                <button class=\"audit-reject\" data-id=\"${s.id}\" style=\"background:#f5222d;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;\">驳回</button>
-                            </td>
-                        </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-            <div style=\"margin-bottom:12px;\">
-                <label>常用原因标签：</label>
-                <div id=\"audit-tag-list\" style=\"margin:6px 0;\">${tagHtml}</div>
-                <input id=\"new-audit-tag\" type=\"text\" placeholder=\"新增自定义标签\" style=\"width:180px;\">
-                <button id=\"add-audit-tag\" style=\"margin-left:6px;\">添加</button>
-            </div>
-            <div style=\"margin-bottom:18px;\">
-                <label>审核意见：<textarea id=\"audit-suggestion\" rows=\"5\" style=\"width:98%;\"></textarea></label>
-                <button class=\"save-audit\" style=\"background:#2d8cf0;color:#fff;border:none;border-radius:5px;padding:6px 18px;font-size:15px;cursor:pointer;\">保存意见</button>
-            </div>
-            <div style=\"margin-top:18px;\">
-                <h3>当前审核意见</h3>
+                        <td style=\"padding:8px;border:1px solid #ddd;\">
+                            <div class=\"student-reason\" data-id=\"${s.id}\">${s.reason || '请选择原因'}</div>
+                        </td>
+                        <td style=\"padding:8px;border:1px solid #ddd;\">
+                            <button class=\"audit-pass\" data-id=\"${s.id}\" style=\"margin-right:5px;background:#52c41a;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;\">通过</button>
+                            <button class=\"audit-reject\" data-id=\"${s.id}\" style=\"background:#f5222d;color:white;border:none;padding:4px 8px;border-radius:4px;cursor:pointer;\">驳回</button>
+                        </td>
+                    </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        <div style=\"margin-bottom:12px;\">
+            <label>常用原因标签：</label>
+            <div id=\"audit-tag-list\" style=\"margin:6px 0;\">${tagHtml}</div>
+            <input id=\"new-audit-tag\" type=\"text\" placeholder=\"新增自定义标签\" style=\"width:180px;\">
+            <button id=\"add-audit-tag\" style=\"margin-left:6px;\">添加</button>
+        </div>
+        <div style=\"margin-bottom:18px;\">
+            <label>审核意见：<textarea id=\"audit-suggestion\" rows=\"5\" style=\"width:98%;\"></textarea></label>
+            <button class=\"save-audit\" style=\"background:#2d8cf0;color:#fff;border:none;border-radius:5px;padding:6px 18px;font-size:15px;cursor:pointer;\">保存意见</button>
+        </div>
+        <div style=\"margin-top:18px;\">
+            <h3>当前审核意见</h3>
                 <p id=\"current-audit-suggestion\" style=\"min-height:24px;\"></p>
-            </div>
-        </div>`;
-        return html;
-    }
+        </div>
+    </div>`;
+    return html;
+}
     // ====== 绑定audit模块事件 ======
     function bindAuditModuleEvents() {
-        // 当前选中的考生ID
-        let currentStudentId = null;
+    // 当前选中的考生ID
+    let currentStudentId = null;
         // 当前选中考生姓名
         let currentStudentName = '';
-        // 标签事件 - 点击标签添加到审核意见
-        $(document).off('click','.audit-tag').on('click','.audit-tag',function(){
-            const tag=$(this).clone().children().remove().end().text();
-            if(currentStudentId) {
+    // 标签事件 - 点击标签添加到审核意见
+    $(document).off('click','.audit-tag').on('click','.audit-tag',function(){
+        const tag=$(this).clone().children().remove().end().text();
+        if(currentStudentId) {
                 // 只更新 textarea，不直接更新原因
-                const $input=$('#audit-suggestion');
-                let val=$input.val();
-                $input.val(val?(val+','+tag):tag);
+        const $input=$('#audit-suggestion');
+        let val=$input.val();
+        $input.val(val?(val+','+tag):tag);
             } else {
                 showToast('请先点击考生，选择要填写原因的对象');
             }
-        });
-        // 点击考生原因单元格，标记为当前选中考生
-        $(document).off('click','.student-reason').on('click','.student-reason',function(){
-            // 移除之前的选中样式
+    });
+    // 点击考生原因单元格，标记为当前选中考生
+    $(document).off('click','.student-reason').on('click','.student-reason',function(){
+        // 移除之前的选中样式
             $('tr[data-student-id]').removeClass('row-selected');
-            $('.student-reason').css('background-color', '');
-            // 设置当前选中并高亮显示
-            currentStudentId = $(this).data('id');
+        $('.student-reason').css('background-color', '');
+        // 设置当前选中并高亮显示
+        currentStudentId = $(this).data('id');
             const $row = $(this).closest('tr');
             $row.addClass('row-selected');
-            $(this).css('background-color', '#e6f7ff');
+        $(this).css('background-color', '#e6f7ff');
             // 获取考生姓名
             currentStudentName = $row.find('td:first').text();
             showToast(`正在为【${currentStudentName}】填写审核原因`);
             // 填充 textarea 为当前考生的原因
             const stu = studentList.find(s=>s.id==currentStudentId);
             $('#audit-suggestion').val(stu && stu.reason ? stu.reason : '');
-        });
-        // 删除自定义标签
-        $(document).off('click','.del-tag').on('click','.del-tag',function(e){
-            e.stopPropagation();
-            let tag=$(this).parent().clone().children().remove().end().text();
-            let customTags=JSON.parse(localStorage.getItem('customAuditTags')||'[]');
-            customTags=customTags.filter(t=>t!==tag);
-            localStorage.setItem('customAuditTags',JSON.stringify(customTags));
-            $('#main-content').html(getAuditModuleHtml());
-            bindAuditModuleEvents();
-        });
-        // 添加自定义标签
-        $('#add-audit-tag').off('click').on('click',function(){
-            let tag=$('#new-audit-tag').val().trim();
-            if(!tag){showToast('请输入标签内容！');return;}
-            let customTags=JSON.parse(localStorage.getItem('customAuditTags')||'[]');
-            if(customTags.includes(tag)){showToast('标签已存在！');return;}
-            customTags.push(tag);
-            localStorage.setItem('customAuditTags',JSON.stringify(customTags));
-            $('#main-content').html(getAuditModuleHtml());
-            bindAuditModuleEvents();
-            $('#new-audit-tag').val('');
-        });
-        // 保存审核意见
-        $('.save-audit').off('click').on('click', function() {
+    });
+    // 删除自定义标签
+    $(document).off('click','.del-tag').on('click','.del-tag',function(e){
+        e.stopPropagation();
+        let tag=$(this).parent().clone().children().remove().end().text();
+        let customTags=JSON.parse(localStorage.getItem('customAuditTags')||'[]');
+        customTags=customTags.filter(t=>t!==tag);
+        localStorage.setItem('customAuditTags',JSON.stringify(customTags));
+        $('#main-content').html(getAuditModuleHtml());
+        bindAuditModuleEvents();
+    });
+    // 添加自定义标签
+    $('#add-audit-tag').off('click').on('click',function(){
+        let tag=$('#new-audit-tag').val().trim();
+        if(!tag){showToast('请输入标签内容！');return;}
+        let customTags=JSON.parse(localStorage.getItem('customAuditTags')||'[]');
+        if(customTags.includes(tag)){showToast('标签已存在！');return;}
+        customTags.push(tag);
+        localStorage.setItem('customAuditTags',JSON.stringify(customTags));
+        $('#main-content').html(getAuditModuleHtml());
+        bindAuditModuleEvents();
+        $('#new-audit-tag').val('');
+    });
+    // 保存审核意见
+    $('.save-audit').off('click').on('click', function() {
             if(!currentStudentId) {
                 showToast('请先点击考生，选择要保存审核意见的对象');
                 return;
             }
-            const suggestion = $('#audit-suggestion').val();
+        const suggestion = $('#audit-suggestion').val();
             // 更新全局 studentList
             const stu = studentList.find(s=>s.id==currentStudentId);
             if(stu) stu.reason = suggestion;
             // 更新页面显示
             $(`.student-reason[data-id=${currentStudentId}]`).text(suggestion||'请选择原因');
-            $('#current-audit-suggestion').text(suggestion);
+        $('#current-audit-suggestion').text(suggestion);
             showToast(`已为【${currentStudentName}】保存审核意见！`);
-        });
-        // 通过审核操作
-        $('.audit-pass').off('click').on('click', function() {
-            const id = $(this).data('id');
-            const reason = $(`.student-reason[data-id=${id}]`).text();
-            if(reason === '请选择原因') {
-                showToast('请先选择审核原因！');
-                $(`.student-reason[data-id=${id}]`).click();
-                return;
+    });
+    // 通过审核操作
+    $('.audit-pass').off('click').on('click', function() {
+        const id = $(this).data('id');
+        const reason = $(`.student-reason[data-id=${id}]`).text();
+        if(reason === '请选择原因') {
+            showToast('请先选择审核原因！');
+            $(`.student-reason[data-id=${id}]`).click();
+            return;
+        }
+        showModal('通过审核', `
+            <p>确认通过该考生资料审核？</p>
+            <p>审核原因：${reason}</p>
+            <textarea id=\"audit-pass-comment\" rows=\"3\" style=\"width:98%;\" placeholder=\"请输入补充意见\"></textarea>
+        `, function() {
+            showToast('审核已通过！');
+            $(`.audit-pass[data-id=${id}]`).closest('tr').find('td:eq(3)').text('已通过');
+            // 更新审核意见到当前意见区域
+            const comment = $('#audit-pass-comment').val();
+            if(comment) {
+                const fullComment = `通过原因：${reason}\n补充意见：${comment}`;
+                $('#current-audit-suggestion').text(fullComment);
             }
-            showModal('通过审核', `
-                <p>确认通过该考生资料审核？</p>
-                <p>审核原因：${reason}</p>
-                <textarea id=\"audit-pass-comment\" rows=\"3\" style=\"width:98%;\" placeholder=\"请输入补充意见\"></textarea>
-            `, function() {
-                showToast('审核已通过！');
-                $(`.audit-pass[data-id=${id}]`).closest('tr').find('td:eq(3)').text('已通过');
-                // 更新审核意见到当前意见区域
-                const comment = $('#audit-pass-comment').val();
-                if(comment) {
-                    const fullComment = `通过原因：${reason}\n补充意见：${comment}`;
-                    $('#current-audit-suggestion').text(fullComment);
-                }
-            });
         });
-        // 驳回审核操作
-        $('.audit-reject').off('click').on('click', function() {
-            const id = $(this).data('id');
-            const reason = $(`.student-reason[data-id=${id}]`).text();
-            if(reason === '请选择原因') {
-                showToast('请先选择驳回原因！');
-                $(`.student-reason[data-id=${id}]`).click();
-                return;
+    });
+    // 驳回审核操作
+    $('.audit-reject').off('click').on('click', function() {
+        const id = $(this).data('id');
+        const reason = $(`.student-reason[data-id=${id}]`).text();
+        if(reason === '请选择原因') {
+            showToast('请先选择驳回原因！');
+            $(`.student-reason[data-id=${id}]`).click();
+            return;
+        }
+        showModal('驳回审核', `
+            <p>确认驳回该考生资料审核？</p>
+            <p>驳回原因：${reason}</p>
+            <textarea id=\"audit-reject-reason\" rows=\"3\" style=\"width:98%;\" placeholder=\"请输入补充说明\"></textarea>
+        `, function() {
+            showToast('审核已驳回！');
+            $(`.audit-reject[data-id=${id}]`).closest('tr').find('td:eq(3)').text('已驳回');
+            // 更新驳回原因到当前意见区域
+            const comment = $('#audit-reject-reason').val();
+            if(comment) {
+                const fullComment = `驳回原因：${reason}\n补充说明：${comment}`;
+                $('#current-audit-suggestion').text(fullComment);
             }
-            showModal('驳回审核', `
-                <p>确认驳回该考生资料审核？</p>
-                <p>驳回原因：${reason}</p>
-                <textarea id=\"audit-reject-reason\" rows=\"3\" style=\"width:98%;\" placeholder=\"请输入补充说明\"></textarea>
-            `, function() {
-                showToast('审核已驳回！');
-                $(`.audit-reject[data-id=${id}]`).closest('tr').find('td:eq(3)').text('已驳回');
-                // 更新驳回原因到当前意见区域
-                const comment = $('#audit-reject-reason').val();
-                if(comment) {
-                    const fullComment = `驳回原因：${reason}\n补充说明：${comment}`;
-                    $('#current-audit-suggestion').text(fullComment);
-                }
-            });
         });
+    });
         // 高亮样式
         $('<style>.row-selected{background:#e6f7ff!important;}</style>').appendTo('head');
-    }
+}
 
     // 模拟全国鉴定站数据
     const stationData = [
@@ -2780,72 +3261,251 @@ $(function() {
     ];
     
     // ====== 更新screen模块内容 ======
-    function getScreenModuleHtml() {
-        // 数据大屏内容
-        let html = `<div class="card">
-            <h2>全国动态考评数据大屏</h2>
-            <div style="display:flex;align-items:center;gap:18px;margin-bottom:18px;">
-                <label>大屏类型：<select id="screen-type">
-                    <option value="overview">全国考核数据概览</option>
-                    <option value="realtime">实时考核动态</option>
-                    <option value="map">全国鉴定站分布</option>
-                    <option value="ranking">全国考核计划排名</option>
-                </select></label>
-                <button class="refresh-screen" style="background:#2d8cf0;color:#fff;border:none;border-radius:5px;padding:6px 18px;font-size:15px;cursor:pointer;">刷新数据</button>
+    function getScreenModuleHtml(tab = 0) {
+        const tabNames = ['数据总览', '实时动态', '地图分布', '计划排名'];
+        let html = `
+        <div id="bigscreen-full" style="position:fixed;z-index:9999;left:0;top:0;width:100vw;height:100vh;background:#101c36;overflow:hidden;">
+          <div style="position:absolute;right:48px;top:32px;z-index:10;">
+            <button id="screen-exit" style="background:rgba(18,32,60,0.98);color:#fff;font-size:18px;border:none;border-radius:8px;padding:10px 32px;box-shadow:0 2px 12px #0a1a2f;cursor:pointer;">退出</button>
             </div>
-            <div id="screen-content" style="padding:18px;background:#f5f5f5;border-radius:8px;min-height:600px;">
-                <!-- 大屏内容将通过AJAX加载或直接填充 -->
-                <p>请选择大屏类型查看详细数据。</p>
+          <div style="padding:0 32px 24px 32px;max-width:1920px;margin:0 auto;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding-top:32px;">
+              <div id="screen-tabs" style="display:flex;gap:18px;">
+                ${tabNames.map((name,i)=>`<div class=\"screen-tab${tab===i?' active':''}\" data-tab=\"${i}\" style=\"padding:10px 36px;font-size:20px;color:${tab===i?'#fff':'#8ec6ff'};background:${tab===i?'#2d8cf0':'transparent'};border-radius:10px;cursor:pointer;transition:all .2s;font-weight:bold;box-shadow:${tab===i?'0 2px 12px #2d8cf0':'none'};\">${name}</div>`).join('')}
+              </div>
+              <div style="font-size:38px;color:#fff;font-weight:bold;letter-spacing:6px;text-shadow:0 4px 32px #2d8cf0;">全国动态考评数据大屏</div>
+              <div style="text-align:right;">
+                <div id="current-time" style="font-size:18px;color:#8ec6ff;margin-bottom:4px;"></div>
+                <div style="font-size:14px;color:#8ec6ff;">实时更新</div>
+              </div>
+            </div>
+            <div id="screen-tab-content" style="margin-top:24px;">
+              ${tab===0?`
+                <div style="display:flex;flex-direction:column;gap:18px;height:calc(100vh - 200px);">
+                  <!-- 顶部统计卡片区 -->
+                  <div style="display:flex;gap:18px;justify-content:space-between;">
+                    ${[{
+                      label:'总考核人数', value:Math.floor(Math.random()*50000+30000), icon:'��', color:'#2d8cf0'
+                    },{
+                      label:'总站点数', value:Math.floor(Math.random()*100+50), icon:'🏢', color:'#19be6b'
+                    },{
+                      label:'总任务数', value:Math.floor(Math.random()*2000+1000), icon:'📋', color:'#ffe066'
+                    },{
+                      label:'总隐患数', value:Math.floor(Math.random()*500+200), icon:'⚠️', color:'#ff5b5b'
+                    },{
+                      label:'完成率', value:Math.floor(Math.random()*20+80)+'%', icon:'✅', color:'#7cffb2'
+                    },{
+                      label:'在线人数', value:Math.floor(Math.random()*2000+1000), icon:'🟢', color:'#8ec6ff'
+                    }].map(card=>`
+                      <div style=\"flex:1;min-width:160px;background:rgba(18,32,60,0.98);border-radius:14px;padding:18px 0 12px 0;box-shadow:0 2px 18px #0a1a2f;display:flex;flex-direction:column;align-items:center;justify-content:center;\">
+                        <div style=\"font-size:32px;margin-bottom:8px;\">${card.icon}</div>
+                        <div style=\"font-size:28px;font-weight:bold;color:${card.color};margin-bottom:4px;\">${card.value}</div>
+                        <div style=\"font-size:16px;color:#8ec6ff;\">${card.label}</div>
+                      </div>
+                    `).join('')}
+                  </div>
+                  
+                  <!-- 实时数据卡片区 -->
+                  <div style="display:flex;gap:18px;justify-content:space-between;">
+                    ${[{
+                      label:'实时考核理论数', value:Math.floor(Math.random()*5000+2000), icon:'📚', color:'#ff6b6b', trend:'+12.5%'
+                    },{
+                      label:'实时技能考核考生人数', value:Math.floor(Math.random()*3000+1500), icon:'🔧', color:'#4ecdc4', trend:'+8.3%'
+                    },{
+                      label:'实时鉴定站点', value:Math.floor(Math.random()*200+100), icon:'📍', color:'#45b7d1', trend:'+5.2%'
+                    },{
+                      label:'实时在线考评员', value:Math.floor(Math.random()*500+200), icon:'👨‍🏫', color:'#96ceb4', trend:'+15.7%'
+                    },{
+                      label:'实时考试进度', value:Math.floor(Math.random()*30+70)+'%', icon:'📊', color:'#feca57', trend:'+2.1%'
+                    },{
+                      label:'实时异常预警', value:Math.floor(Math.random()*50+10), icon:'🚨', color:'#ff9ff3', trend:'-3.4%'
+                    }].map(card=>`
+                      <div class=\"real-time-card\" style=\"flex:1;min-width:160px;background:rgba(18,32,60,0.98);border-radius:14px;padding:18px 0 12px 0;box-shadow:0 2px 18px #0a1a2f;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;\">
+                        <div style=\"font-size:32px;margin-bottom:8px;\">${card.icon}</div>
+                        <div class=\"card-value\" style=\"font-size:28px;font-weight:bold;color:${card.color};margin-bottom:4px;\">${card.value}</div>
+                        <div style=\"font-size:16px;color:#8ec6ff;margin-bottom:4px;\">${card.label}</div>
+                        <div class=\"card-trend\" style=\"font-size:12px;color:${card.trend.startsWith('+')?'#52c41a':'#ff4d4f'};font-weight:bold;\">${card.trend}</div>
+                      </div>
+                    `).join('')}
+                  </div>
+                  
+                  <!-- 中部趋势与分布 -->
+                  <div style="display:flex;gap:18px;flex:1;min-height:0;">
+                    <div style="flex:2;display:flex;flex-direction:column;gap:18px;">
+                      <div style="background:rgba(18,32,60,0.98);border-radius:14px;padding:18px;box-shadow:0 2px 18px #0a1a2f;flex:1;">
+                        <div style="color:#8ec6ff;font-size:20px;margin-bottom:10px;">考核趋势</div>
+                        <div id="trend-chart" style="height:140px;width:100%;"></div>
+                      </div>
+                      <div style="background:rgba(18,32,60,0.98);border-radius:14px;padding:18px;box-shadow:0 2px 18px #0a1a2f;flex:1;">
+                        <div style="color:#8ec6ff;font-size:20px;margin-bottom:10px;">区域分布</div>
+                        <div id="district-bar" style="height:140px;width:100%;"></div>
+                      </div>
+                    </div>
+                    <div style="flex:3;display:flex;flex-direction:column;gap:18px;">
+                      <div style="background:rgba(18,32,60,0.98);border-radius:14px;padding:18px;box-shadow:0 2px 18px #0a1a2f;flex:2;display:flex;flex-direction:column;">
+                        <div style="color:#8ec6ff;font-size:20px;margin-bottom:10px;">全国考核站点分布</div>
+                        <div id="bj-map" style="height:100%;min-height:240px;width:100%;"></div>
+                      </div>
+                    </div>
+                    <div style="flex:1.2;display:flex;flex-direction:column;gap:18px;">
+                      <div style="background:rgba(18,32,60,0.98);border-radius:14px;padding:18px;box-shadow:0 2px 18px #0a1a2f;">
+                        <div style="color:#8ec6ff;font-size:20px;margin-bottom:10px;">类型占比</div>
+                        <div id="type-pie" style="height:110px;width:100%;"></div>
+                      </div>
+                      <div style="background:rgba(18,32,60,0.98);border-radius:14px;padding:18px;box-shadow:0 2px 18px #0a1a2f;">
+                        <div style="color:#8ec6ff;font-size:20px;margin-bottom:10px;">历史趋势</div>
+                        <div id="history-line" style="height:70px;width:100%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              `:''}
+            </div>
             </div>
         </div>`;
         return html;
     }
     
     // ====== 绑定screen模块事件 ======
-    function bindScreenModuleEvents() {
-        // 初始加载
-        setTimeout(() => {
-            $('.refresh-screen').trigger('click');
-        }, 100);
+    function bindScreenModuleEvents(tab = 0) {
+        // 假数据
+        const trendData = Array.from({length:12},()=>Math.floor(Math.random()*100+30));
+        const trendMonth = Array.from({length:12},(_,i)=>`${i+1}月`);
+        const typePieData = [
+          {value: Math.floor(Math.random()*20000+10000), name: '理论考核'},
+          {value: Math.floor(Math.random()*20000+10000), name: '技能考核'},
+          {value: Math.floor(Math.random()*10000+5000), name: '综合考核'}
+        ];
+        const historyLineData = Array.from({length:12},()=>Math.random().toFixed(2));
+        const historyLineMonth = trendMonth;
+        const districtBarData = [
+          {name:'东城区',rate:98.22,count:169},
+          {name:'西城区',rate:90.12,count:409},
+          {name:'朝阳区',rate:80.7,count:627},
+          {name:'海淀区',rate:70.48,count:403},
+          {name:'丰台区',rate:60.69,count:359},
+          {name:'石景山区',rate:50.28,count:266},
+          {name:'门头沟区',rate:40.75,count:144},
+          {name:'房山区',rate:30.67,count:744}
+        ];
+        // 站点分布假数据
+        const mapPoints = [
+          {name:'东城区',x:0.62,y:0.32,value:169},
+          {name:'西城区',x:0.58,y:0.34,value:409},
+          {name:'朝阳区',x:0.72,y:0.38,value:627},
+          {name:'海淀区',x:0.54,y:0.28,value:403},
+          {name:'丰台区',x:0.60,y:0.44,value:359},
+          {name:'石景山区',x:0.50,y:0.36,value:266},
+          {name:'门头沟区',x:0.44,y:0.40,value:144},
+          {name:'房山区',x:0.40,y:0.52,value:744}
+        ];
+        // 实时数据更新函数
+        function updateRealTimeData() {
+          const realTimeCards = document.querySelectorAll('.real-time-card');
+          realTimeCards.forEach(card => {
+            const valueEl = card.querySelector('.card-value');
+            const trendEl = card.querySelector('.card-trend');
+            if (valueEl && trendEl) {
+              // 更新数值
+              const currentValue = parseInt(valueEl.textContent.replace(/[^\d]/g, ''));
+              const newValue = currentValue + Math.floor(Math.random() * 100 - 50);
+              valueEl.textContent = newValue.toLocaleString();
+              
+              // 更新趋势
+              const trend = Math.random() > 0.5 ? '+' : '-';
+              const trendValue = (Math.random() * 20).toFixed(1);
+              trendEl.textContent = `${trend}${trendValue}%`;
+              trendEl.style.color = trend === '+' ? '#52c41a' : '#ff4d4f';
+            }
+          });
+        }
         
-        // 刷新数据
-        $('.refresh-screen').on('click', function() {
-            const type = $('#screen-type').val();
-            let content = '<p>正在加载中...</p>';
-            
-            // 根据选择的大屏类型显示不同内容
-            if(type === 'overview') {
-                // 全国考核数据概览
-                content = generateOverviewContent();
-            } else if(type === 'realtime') {
-                // 实时考核动态
-                content = generateRealtimeContent();
-            } else if(type === 'map') {
-                // 全国鉴定站分布
-                content = generateMapContent();
-            } else if(type === 'ranking') {
-                // 全国考核计划排名
-                content = generateRankingContent();
-            }
-            
-            $('#screen-content').html(content);
-            showToast('数据已刷新！');
-            
-            // 如果是实时考核动态，启动滚动效果
-            if(type === 'realtime') {
-                startDynamicScroll();
-            }
-            
-            // 如果是地图，初始化地图
-            if(type === 'map') {
-                initMap();
-            }
-        });
+        // 更新时间显示
+        function updateTime() {
+          const timeEl = document.getElementById('current-time');
+          if (timeEl) {
+            const now = new Date();
+            timeEl.textContent = now.toLocaleString('zh-CN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            });
+          }
+        }
         
-        // 监听大屏类型变化
-        $('#screen-type').on('change', function() {
-            $('.refresh-screen').trigger('click');
-        });
+        // 每秒更新时间
+        setInterval(updateTime, 1000);
+        updateTime(); // 立即更新一次
+        
+        // 每5秒更新一次实时数据
+        setInterval(updateRealTimeData, 5000);
+        
+        setTimeout(()=>{
+          if(window.echarts && tab===0){
+            let trendChart = echarts.init(document.getElementById('trend-chart'));
+            trendChart.setOption({
+              xAxis: {type:'category',data:trendMonth,axisLabel:{color:'#8ec6ff'}},
+              yAxis: {type:'value',axisLabel:{color:'#8ec6ff'}},
+              series: [{data:trendData,type:'line',smooth:true,lineStyle:{color:'#2d8cf0'},areaStyle:{color:'rgba(45,140,240,0.15)'}}],
+              grid:{left:30,right:10,top:30,bottom:30},
+              backgroundColor:'transparent'
+            });
+            let typePie = echarts.init(document.getElementById('type-pie'));
+            typePie.setOption({
+              series:[{
+                type:'pie',radius:['60%','80%'],
+                data:typePieData,
+                label:{color:'#fff',fontSize:14,formatter:'{b}\n{c}'},
+                color:['#2d8cf0','#19be6b','#ffe066'],
+                itemStyle:{borderColor:'#101c36',borderWidth:4}
+              }],
+              backgroundColor:'transparent'
+            });
+            let historyLine = echarts.init(document.getElementById('history-line'));
+            historyLine.setOption({
+              xAxis: {type:'category',data:historyLineMonth,axisLabel:{color:'#8ec6ff'}},
+              yAxis: {type:'value',axisLabel:{color:'#8ec6ff'}},
+              series: [{data:historyLineData,type:'line',smooth:true,lineStyle:{color:'#ffe066'},areaStyle:{color:'rgba(255,224,102,0.15)'}}],
+              grid:{left:30,right:10,top:30,bottom:30},
+              backgroundColor:'transparent'
+            });
+            let districtBar = echarts.init(document.getElementById('district-bar'));
+            districtBar.setOption({
+              xAxis:{type:'category',data:districtBarData.map(d=>d.name),axisLabel:{color:'#8ec6ff'}},
+              yAxis:{type:'value',axisLabel:{color:'#8ec6ff'}},
+              series:[{type:'bar',data:districtBarData.map(d=>d.rate),itemStyle:{color:'#2d8cf0',barBorderRadius:4},barWidth:18}],
+              grid:{left:30,right:10,top:30,bottom:30},
+              backgroundColor:'transparent'
+            });
+            // 地图分布（静态图片+SVG点标注+区域色块）
+            let mapDom = document.getElementById('bj-map');
+            if(mapDom){
+              mapDom.innerHTML = `<div style='position:relative;width:100%;height:100%;'><img src='https://img1.imgtp.com/2023/07/21/0Qw1Qw1Qw1.png' style='width:100%;height:100%;object-fit:contain;filter:brightness(1.1) drop-shadow(0 0 24px #2d8cf0);'>${mapPoints.map(p=>`<div title='${p.name}: ${p.value}人' style='position:absolute;left:${p.x*100}%;top:${p.y*100}%;transform:translate(-50%,-50%);background:#2d8cf0;border-radius:50%;width:28px;height:28px;box-shadow:0 0 12px #2d8cf0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:bold;cursor:pointer;' onmouseover='this.style.background="#ffe066"' onmouseout='this.style.background="#2d8cf0"'>${p.value}</div>`).join('')}</div>`;
+            }
+          }
+        }, 200);
+        // Tab切换和退出按钮
+        setTimeout(()=>{
+          document.querySelectorAll('.screen-tab').forEach(tabEl=>{
+            tabEl.onclick = ()=>{
+              document.body.style.overflow = 'hidden';
+              document.getElementById('main-content').innerHTML = getScreenModuleHtml(parseInt(tabEl.getAttribute('data-tab')));
+              bindScreenModuleEvents(parseInt(tabEl.getAttribute('data-tab')));
+            };
+          });
+          const exitBtn = document.getElementById('screen-exit');
+          if(exitBtn){
+            exitBtn.onclick = ()=>{
+              document.body.style.overflow = '';
+              document.getElementById('main-content').innerHTML = getPlanModuleHtml();
+              bindPlanModuleEvents();
+            };
+          }
+          document.body.style.overflow = 'hidden';
+        }, 300);
     }
     
     // 生成全国考核数据概览内容
@@ -3283,7 +3943,30 @@ $(function() {
     }
 
     function nowTime() {
-        const d = new Date();
-        return d.getFullYear()+'-'+(d.getMonth()+1).toString().padStart(2,'0')+'-'+d.getDate().toString().padStart(2,'0')+' '+d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+        const now = new Date();
+        return now.getFullYear() + '-' + 
+               String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(now.getDate()).padStart(2, '0') + ' ' + 
+               String(now.getHours()).padStart(2, '0') + ':' + 
+               String(now.getMinutes()).padStart(2, '0') + ':' + 
+               String(now.getSeconds()).padStart(2, '0');
+    }
+
+    $(document).on('click', '.user-info button', function() {
+        localStorage.removeItem('isAdminLogin');
+        window.location.href = 'login.html';
+    });
+
+    // 登录后进入主页弹窗提醒（每次登录都弹）
+    if (localStorage.getItem('isAdminLogin') === '1') {
+        setTimeout(function() {
+            showModal(
+                '月计划数量提醒',
+                '请各鉴定站及时填写本月鉴定计划量！',
+                null,
+                null,
+                '我知道了'
+            );
+        }, 500);
     }
 });
